@@ -289,7 +289,7 @@ class MainActivity : Activity() {
 
     private fun showHistorySearch() {
         val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(8), dp(18), 0) }
-        val search = EditText(this).apply { hint = "جست‌وجوی تاریخ؛ نمونه ۱۴۰۵/۰۹ یا ۱۴۰۵/۰۹/۱۸"; singleLine = true }
+        val search = EditText(this).apply { hint = "جست‌وجوی تاریخ؛ نمونه ۱۴۰۵/۰۹ یا ۱۴۰۵/۰۹/۱۸"; isSingleLine = true }
         val filter = android.widget.Spinner(this)
         val adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, listOf("همه سوابق", "روزانه", "ماهانه", "سالانه"))
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
