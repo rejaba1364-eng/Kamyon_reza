@@ -1,5 +1,5 @@
+name: Build Kamyon Reza Android APK
 on: [push, workflow_dispatch]
-name: Build Kamyon Reza concurrency: 
 permissions:
   contents: write
 
