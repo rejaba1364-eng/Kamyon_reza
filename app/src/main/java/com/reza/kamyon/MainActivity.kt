@@ -159,7 +159,7 @@ class MainActivity : Activity() {
         val e = EditText(this).apply {
             hint = hintText
             textSize = 15f
-            singleLine = true
+            isSingleLine = true
             setText(prefs.getString(key, ""))
             setPadding(dp(12), dp(8), dp(12), dp(8))
             setBackgroundColor(Color.WHITE)
