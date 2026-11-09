@@ -1,0 +1,263 @@
+package com.reza.kamyon
+
+import android.Manifest
+import android.app.Activity
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Typeface
+import android.graphics.Color
+import android.os.Build
+import android.os.Bundle
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.CheckBox
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.Toast
+import java.util.Calendar
+
+private const val PREFS = "kamyon_reza"
+
+class MainActivity : Activity() {
+    private val prefs by lazy { getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
+    private val green = Color.rgb(23, 107, 91)
+    private val ink = Color.rgb(34, 48, 45)
+    private val muted = Color.rgb(100, 116, 111)
+    private val paper = Color.rgb(244, 247, 246)
+    private lateinit var root: LinearLayout
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        window.statusBarColor = Color.rgb(18, 76, 66)
+        window.navigationBarColor = paper
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 77)
+        }
+        val scroll = ScrollView(this)
+        scroll.setBackgroundColor(paper)
+        root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(28))
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        }
+        scroll.addView(root)
+        setContentView(scroll)
+        buildScreen()
+    }
+
+    private fun buildScreen() {
+        text("کامیون رضا", 27f, Color.WHITE, true).also {
+            it.setPadding(dp(18), dp(22), dp(18), dp(4))
+            it.setBackgroundColor(green)
+            root.addView(it, matchWrap())
+        }
+        text("چک‌لیست و نگهداری خودرو | قابل استفاده بدون اینترنت", 13f, Color.WHITE).also {
+            it.setPadding(dp(18), 0, dp(18), dp(18))
+            it.setBackgroundColor(green)
+            root.addView(it, matchWrap())
+        }
+
+        sectionTitle("مشخصات خودرو")
+        val vehicle = editField("نام خودرو یا مدل", "vehicle_name")
+        val plate = editField("شماره پلاک", "vehicle_plate")
+        val km = editField("کارکرد فعلی (کیلومتر)", "vehicle_km")
+        button("ذخیره مشخصات خودرو") {
+            saveField("vehicle_name", vehicle); saveField("vehicle_plate", plate); saveField("vehicle_km", km)
+            toast("مشخصات خودرو ذخیره شد")
+        }
+
+        sectionTitle("چک‌لیست‌های سرویس")
+        checklist("بررسی روزانه", "daily", listOf(
+            "آب رادیاتور و مایع خنک‌کننده", "سطح روغن موتور", "وضعیت باتری و اتصالات", "باد و سلامت لاستیک‌ها", "شلنگ‌ها و اتصالات", "چراغ‌ها و راهنماها", "ترمز و ترمز دستی", "آینه‌ها و برف‌پاک‌کن", "نشتی روغن یا آب", "تجهیزات ایمنی و کپسول آتش‌نشانی"
+        ))
+        checklist("سرویس ماهانه", "monthly", listOf(
+            "بررسی فیلتر هوا", "بررسی روغن و فیلترها", "بازدید تسمه‌ها", "بررسی سیستم خنک‌کننده", "بازدید لنت و اتصالات ترمز", "بررسی جلوبندی و فرمان", "کنترل زاپاس و ابزار خودرو", "نظافت کابین و بدنه"
+        ))
+        checklist("موارد سالانه", "yearly", listOf(
+            "تمدید بیمه شخص ثالث", "انجام معاینه فنی", "بررسی مدارک و مجوزهای خودرو", "بررسی کارت سوخت", "بازدید کامل سیستم برق", "سرویس کامل موتور و گیربکس"
+        ))
+
+        sectionTitle("یادآوری مدارک")
+        text("تاریخ‌ها را به شمسی وارد کن؛ نمونه: ۱۴۰۵/۰۹/۲۰. یادآوری ۷ روز قبل تنظیم می‌شود.", 13f, muted)
+        val insurance = editField("تاریخ پایان بیمه شخص ثالث (شمسی)", "date_insurance")
+        val inspection = editField("تاریخ پایان معاینه فنی (شمسی)", "date_inspection")
+        button("ذخیره تاریخ‌ها و تنظیم یادآوری") {
+            val a = insurance.text.toString().trim()
+            val b = inspection.text.toString().trim()
+            if (a.isNotEmpty() && Jalali.toGregorian(a) == null) { toast("تاریخ بیمه را مثل ۱۴۰۵/۰۹/۲۰ وارد کن"); return@button }
+            if (b.isNotEmpty() && Jalali.toGregorian(b) == null) { toast("تاریخ معاینه فنی را مثل ۱۴۰۵/۰۹/۲۰ وارد کن"); return@button }
+            prefs.edit().putString("date_insurance", a).putString("date_inspection", b).apply()
+            ReminderScheduler.schedule(this, "insurance", a)
+            ReminderScheduler.schedule(this, "inspection", b)
+            toast("تاریخ‌ها ذخیره شد؛ یادآوری ۷ روز قبل تنظیم شد")
+        }
+
+        sectionTitle("یادداشت تعمیر و سرویس")
+        val notes = EditText(this).apply {
+            hint = "شرح تعمیر، قطعه تعویض‌شده، هزینه و توضیحات..."
+            minLines = 4
+            gravity = Gravity.TOP or Gravity.RIGHT
+            textSize = 15f
+            setText(prefs.getString("maintenance_notes", ""))
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setBackgroundColor(Color.WHITE)
+        }
+        root.addView(notes, matchWrap().apply { topMargin = dp(8) })
+        button("ذخیره یادداشت") { prefs.edit().putString("maintenance_notes", notes.text.toString()).apply(); toast("یادداشت ذخیره شد") }
+        button("اشتراک‌گذاری گزارش خودرو") { shareReport() }
+        text("اطلاعات روی همین گوشی ذخیره می‌شود. برای نگهداری نسخه پشتیبان، گزارش را با پیام‌رسان یا فایل‌ها به اشتراک بگذار.", 12f, muted).also { root.addView(it, matchWrap()) }
+    }
+
+    private fun checklist(title: String, key: String, items: List<String>) {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(10), dp(14), dp(12))
+            setBackgroundColor(Color.WHITE)
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        }
+        val heading = text(title, 18f, green, true)
+        card.addView(heading, matchWrap())
+        items.forEachIndexed { index, label ->
+            val id = "check_${key}_$index"
+            val cb = CheckBox(this).apply {
+                text = label
+                textSize = 15f
+                setTextColor(ink)
+                isChecked = prefs.getBoolean(id, false)
+                buttonTintList = android.content.res.ColorStateList.valueOf(green)
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean(id, checked).apply() }
+            }
+            card.addView(cb, matchWrap())
+        }
+        val note = EditText(this).apply {
+            hint = "یادداشت این بخش..."
+            textSize = 14f
+            setText(prefs.getString("note_$key", ""))
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            setBackgroundColor(paper)
+        }
+        card.addView(note, matchWrap().apply { topMargin = dp(6) })
+        button("ذخیره یادداشت ${title}") { prefs.edit().putString("note_$key", note.text.toString()).apply(); toast("یادداشت ذخیره شد") }
+        root.addView(card, matchWrap().apply { topMargin = dp(8) })
+    }
+
+    private fun sectionTitle(value: String) {
+        val t = text(value, 20f, ink, true)
+        t.setPadding(0, dp(22), 0, dp(5))
+        root.addView(t, matchWrap())
+    }
+
+    private fun editField(hintText: String, key: String): EditText {
+        val e = EditText(this).apply {
+            hint = hintText
+            textSize = 15f
+            singleLine = true
+            setText(prefs.getString(key, ""))
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setBackgroundColor(Color.WHITE)
+        }
+        root.addView(e, matchWrap().apply { topMargin = dp(7) })
+        return e
+    }
+
+    private fun saveField(key: String, e: EditText) { prefs.edit().putString(key, e.text.toString()).apply() }
+
+    private fun button(label: String, action: () -> Unit) {
+        val b = Button(this).apply {
+            text = label
+            textSize = 14f
+            isAllCaps = false
+            setTextColor(Color.WHITE)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(green)
+            setOnClickListener { action() }
+        }
+        root.addView(b, matchWrap().apply { topMargin = dp(8) })
+    }
+
+    private fun text(value: String, size: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
+        text = value; textSize = size; setTextColor(color); gravity = Gravity.RIGHT
+        if (bold) setTypeface(typeface, Typeface.BOLD)
+    }
+
+    private fun matchWrap() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+    private fun toast(value: String) = Toast.makeText(this, value, Toast.LENGTH_LONG).show()
+
+    private fun shareReport() {
+        val out = StringBuilder("گزارش خودرو - کامیون رضا\n")
+        out.append("خودرو: ${prefs.getString("vehicle_name", "ثبت نشده")}\nپلاک: ${prefs.getString("vehicle_plate", "ثبت نشده")}\nکارکرد: ${prefs.getString("vehicle_km", "ثبت نشده")}\n\n")
+        val groups = listOf(
+            Triple("بررسی روزانه", "daily", listOf("آب رادیاتور و مایع خنک‌کننده", "سطح روغن موتور", "وضعیت باتری و اتصالات", "باد و سلامت لاستیک‌ها", "شلنگ‌ها و اتصالات", "چراغ‌ها و راهنماها", "ترمز و ترمز دستی", "آینه‌ها و برف‌پاک‌کن", "نشتی روغن یا آب", "تجهیزات ایمنی و کپسول آتش‌نشانی")),
+            Triple("سرویس ماهانه", "monthly", listOf("بررسی فیلتر هوا", "بررسی روغن و فیلترها", "بازدید تسمه‌ها", "بررسی سیستم خنک‌کننده", "بازدید لنت و اتصالات ترمز", "بررسی جلوبندی و فرمان", "کنترل زاپاس و ابزار خودرو", "نظافت کابین و بدنه")),
+            Triple("موارد سالانه", "yearly", listOf("تمدید بیمه شخص ثالث", "انجام معاینه فنی", "بررسی مدارک و مجوزهای خودرو", "بررسی کارت سوخت", "بازدید کامل سیستم برق", "سرویس کامل موتور و گیربکس"))
+        )
+        groups.forEach { (label, key, items) ->
+            out.append("\n$label\n")
+            items.forEachIndexed { index, item ->
+                val mark = if (prefs.getBoolean("check_${key}_$index", false)) "✓" else "□"
+                out.append("$mark $item\n")
+            }
+            out.append("یادداشت: ${prefs.getString("note_$key", "")}\n")
+        }
+        out.append("بیمه شخص ثالث: ${prefs.getString("date_insurance", "ثبت نشده")}\nمعاینه فنی: ${prefs.getString("date_inspection", "ثبت نشده")}\n")
+        out.append("\nیادداشت تعمیرات:\n${prefs.getString("maintenance_notes", "")}")
+        val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_SUBJECT, "گزارش خودرو"); putExtra(Intent.EXTRA_TEXT, out.toString()) }
+        startActivity(Intent.createChooser(send, "اشتراک‌گذاری گزارش"))
+    }
+}
+
+object ReminderScheduler {
+    fun schedule(context: Context, kind: String, jalaliDate: String) {
+        val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val request = if (kind == "insurance") 5101 else 5102
+        val intent = Intent(context, ReminderReceiver::class.java).putExtra("kind", kind)
+        val pending = PendingIntent.getBroadcast(context, request, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        alarm.cancel(pending)
+        if (jalaliDate.isBlank()) return
+        val gregorian = Jalali.toGregorian(jalaliDate) ?: return
+        val calendar = Calendar.getInstance().apply {
+            set(gregorian[0], gregorian[1] - 1, gregorian[2], 9, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+            add(Calendar.DAY_OF_YEAR, -7)
+        }
+        if (calendar.timeInMillis <= System.currentTimeMillis()) return
+        alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pending)
+    }
+}
+
+object Jalali {
+    fun toGregorian(input: String): IntArray? {
+        val normalized = input.trim().replace('۰','0').replace('۱','1').replace('۲','2').replace('۳','3').replace('۴','4').replace('۵','5').replace('۶','6').replace('۷','7').replace('۸','8').replace('۹','9').replace('-', '/')
+        val p = normalized.split('/')
+        if (p.size != 3) return null
+        val jy = p[0].toIntOrNull() ?: return null
+        val jm = p[1].toIntOrNull() ?: return null
+        val jd = p[2].toIntOrNull() ?: return null
+        if (jy !in 1300..1500 || jm !in 1..12 || jd !in 1..31) return null
+        var days = 365 * (jy - 979) + ((jy - 979) / 33) * 8 + (((jy - 979) % 33) + 3) / 4
+        for (m in 1 until jm) days += if (m <= 6) 31 else 30
+        days += jd - 1 + 79
+        var gy = 1600 + 400 * (days / 146097)
+        var d = days % 146097
+        var leap = true
+        if (d >= 36525) {
+            d--; gy += 100 * (d / 36524); d %= 36524
+            if (d >= 365) d++
+        }
+        gy += 4 * (d / 1461); d %= 1461
+        if (d >= 366) { leap = false; d--; gy += d / 365; d %= 365 }
+        val monthDays = intArrayOf(31, if (leap) 29 else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+        var gm = 0
+        while (gm < 12 && d >= monthDays[gm]) { d -= monthDays[gm]; gm++ }
+        if (gm !in 0..11) return null
+        return intArrayOf(gy, gm + 1, d + 1)
+    }
+}
