@@ -1,16 +1,5 @@
-name: Build Kamyon Reza Android APK
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/build.yml'
-      - 'app/**'
-      - 'build.gradle.kts'
-      - 'settings.gradle.kts'
-      - 'gradle.properties'
-  workflow_dispatch:
-
+on: [push, workflow_dispatch]
+name: Build Kamyon Reza concurrency: 
 permissions:
   contents: write
 
