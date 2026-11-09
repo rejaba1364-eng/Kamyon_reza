@@ -482,7 +482,7 @@ jobs:
             git push origin HEAD:main
           fi
 
-      - name: Install maintained app source
+            - name: Install maintained app source
         run: |
           test -f source/MainActivity.kt
           cp source/MainActivity.kt app/src/main/java/com/reza/kamyon/MainActivity.kt
@@ -493,7 +493,9 @@ jobs:
         run: |
           test -n "$KAMYON_KEYSTORE_BASE64"
           printf '%s' "$KAMYON_KEYSTORE_BASE64" | base64 --decode > app/kamyon-release.jks
-          test -s app/kamyon-release.jks- name: Build real debug APK
+          test -s app/kamyon-release.jks
+
+      - name: Build real debug APK
         run: gradle --no-daemon :app:assembleDebug
 
       - name: Publish APK as a direct GitHub Release download
